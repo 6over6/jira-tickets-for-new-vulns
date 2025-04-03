@@ -53,7 +53,7 @@ jobs:
           name: "Publish Release on GitHub"
           command: |
             VERSION=$(cat VERSION)
-            gh release create v${VERSION} --generate-notes --title "Release v${VERSION}" --repo ${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}
+            gh release create v${VERSION} --generate-notes --title "Release v${VERSION}" --repo ${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME} dist/snyk-jira-sync-linux dist/snyk-jira-sync-macos dist/snyk-jira-sync-win.exe dist/snyk-jira-sync-linux.sha256 dist/snyk-jira-sync-macos.sha256 dist/snyk-jira-sync-win.exe.sha256
 
 workflows:
   build-test-monitor-publish:
