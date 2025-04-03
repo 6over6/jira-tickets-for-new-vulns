@@ -53,7 +53,7 @@ jobs:
           name: "Publish Release on GitHub"
           command: |
             VERSION=$(cat VERSION)
-            ghr -t ${GITHUB_TOKEN} -u ${CIRCLE_PROJECT_USERNAME} -r ${CIRCLE_PROJECT_REPONAME} -c ${CIRCLE_SHA1} ${VERSION} dist/
+            gh release create v${VERSION} --generate-notes --title "Release v${VERSION}" --repo ${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}
 
 workflows:
   build-test-monitor-publish:
