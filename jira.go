@@ -10,6 +10,8 @@ import (
 	"strings"
 
 	"github.com/michael-go/go-jsn/jsn"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
 
 // JiraIssue represents the top level Struct for Jira issue description
@@ -158,7 +160,7 @@ func openJiraTicket(flags flags, projectInfo jsn.Json, vulnForJira interface{}, 
 				priority.Name = "Highest"
 			} else {
 
-				priority.Name = strings.Title(severity)
+				priority.Name = cases.Title(language.English).String(severity)
 
 			}
 
@@ -253,15 +255,15 @@ func openJiraTickets(flags flags, projectInfo jsn.Json, vulnsForJira map[string]
 		issueType := jsonVuln.K("data").K("attributes").K("issueType").String().Value
 		isCodeIssue := strings.Contains(issueType, "code")
 		// skip ticket creating if the vuln is not upgradable
-		if flags.optionalFlags.ifUpgradeAvailableOnly && isCodeIssue == false {
-			if jsonVuln.K("fixInfo").K("isUpgradable").Bool().Value == false {
+		if flags.optionalFlags.ifUpgradeAvailableOnly && !isCodeIssue {
+			if !jsonVuln.K("fixInfo").K("isUpgradable").Bool().Value {
 				message := fmt.Sprintf("Skipping creating ticket for %s because no upgrade is available.", jsonVuln.K("issueData").K("title").String().Value)
 				fullListNotCreatedIssue += displayErrorForIssue(vulnForJira, "ifUpgradeAvailableOnly", errors.New(message), "", customDebug)
 				continue
 			}
-		} else if flags.optionalFlags.ifAutoFixableOnly && isCodeIssue == false {
+		} else if flags.optionalFlags.ifAutoFixableOnly && !isCodeIssue {
 			// skip ticket creating if the vuln is not fixable
-			if jsonVuln.K("fixInfo").K("isFixable").Bool().Value == false {
+			if !jsonVuln.K("fixInfo").K("isFixable").Bool().Value {
 				message := fmt.Sprintf("Skipping creating ticket for %s because no fix is available.", jsonVuln.K("issueData").K("title").String().Value)
 				fullListNotCreatedIssue += displayErrorForIssue(vulnForJira, "ifAutoFixableOnly", errors.New(message), "", customDebug)
 				continue

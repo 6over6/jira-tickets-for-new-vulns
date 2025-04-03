@@ -234,7 +234,6 @@ Add the mandatory fields extracted during setup to the ticket
 **
 */
 func addMandatoryFieldToTicket(ticket []byte, customMandatoryField map[string]interface{}, customDebug debug) []byte {
-
 	unmarshalledTicket := make(map[string]interface{})
 	fields := make(map[string]interface{})
 	newTicket := make(map[string]interface{})
@@ -261,22 +260,37 @@ func addMandatoryFieldToTicket(ticket []byte, customMandatoryField map[string]in
 	}
 
 	for i, s := range customMandatoryField {
-
-		value, ok := s.(map[string]interface{})
-		if ok {
-			v, ok := value["value"].(string)
-			if ok {
-				if strings.HasPrefix(v, JiraPrefix) {
-					s, _ = supportJiraFormats(v, customDebug)
+		switch v := s.(type) {
+		case string:
+			// Handle string values
+			if strings.HasPrefix(v, JiraPrefix) {
+				// Process special Jira formats
+				processedValue, err := supportJiraFormats(v, customDebug)
+				if err != nil {
+					customDebug.Debug(fmt.Sprintf("*** ERROR *** Failed to process Jira format for field %s: %v", i, err))
+					continue
 				}
+				fields[i] = processedValue
+			} else {
+				// Use string value directly
+				fields[i] = v
 			}
-		} else {
-			customDebug.Debug(fmt.Sprintf("*** ERROR *** Expected mandatory Jira fields configuration to be in format map[string]interface{}, received type: %T for field %s ", s, i))
-			message := fmt.Sprintf("*** ERROR *** Expected mandatory Jira fields configuration to be in format map[string]interface{}, received type: %T for field %s ", s, i)
-			writeErrorFile("addMandatoryFieldToTicket", message, customDebug)
+		case map[string]interface{}:
+			// Handle map values (existing behavior)
+			if val, ok := v["value"].(string); ok && strings.HasPrefix(val, JiraPrefix) {
+				processedValue, err := supportJiraFormats(val, customDebug)
+				if err != nil {
+					customDebug.Debug(fmt.Sprintf("*** ERROR *** Failed to process Jira format for field %s: %v", i, err))
+					continue
+				}
+				fields[i] = processedValue
+			} else {
+				fields[i] = s
+			}
+		default:
+			// Handle other types (arrays, etc.) as is
+			fields[i] = s
 		}
-
-		fields[i] = s
 	}
 
 	newTicket["fields"] = fields

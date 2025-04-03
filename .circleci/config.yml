@@ -1,24 +1,23 @@
-# Golang CircleCI 2.0 configuration file
-#
-# Check https://circleci.com/docs/2.0/language-go/ for more details
-# make sure the circle project key is a read/write key (on circleCI project settings -> key -> add user key)
-# .goreleaser.yml needed next to the main function
-# svu is tool that automatically generate tags https://github.com/caarlos0/svu
-# doc: https://goreleaser.com/quick-start/
-
 version: 2.1
+
 orbs:
-  snyk: snyk/snyk@1.1.2
+  gh: circleci/github-cli@2.7.0
+
 jobs:
   build-test-monitor:
       docker:
         # specify the version
-        - image: cimg/go:1.19.0
-
+        - image: cimg/go:1.24
       steps:
         - checkout
-        - run: go test -v
-        - run: ./generate-binaries.sh
+        - run:
+            name: "Test"
+            command: |
+              go test -v
+        - run:
+            name: "Generate Binaries"
+            command: |
+              ./generate-binaries.sh
         - persist_to_workspace:
             root: .
             paths:
@@ -27,50 +26,36 @@ jobs:
   build-test:
       docker:
         # specify the version
-        - image: cimg/go:1.19.0
+        - image: cimg/go:1.24
 
       steps:
         - checkout
-        - run: go test -v
-
-  build-test-from-fork:
-      docker:
-        # specify the version
-        - image: cimg/go:1.19.0
-
-      steps:
-        - checkout
-        - run: go test -v
+        - run:
+            name: "Test"
+            command: |
+              go test -v
 
   publish-github-release:
     docker:
-      - image: aarlaudsnyk/utility-containers
+      - image: cimg/base:2025.04
     steps:
       - checkout
+      - gh/setup
       - attach_workspace:
           at: .
-      - run: sha256sum dist/snyk-jira-sync-linux > dist/snyk-jira-sync-linux.sha256
-      - run: sha256sum dist/snyk-jira-sync-macos > dist/snyk-jira-sync-macos.sha256
-      - run: sha256sum dist/snyk-jira-sync-win.exe > dist/snyk-jira-sync-win.exe.sha256
+      - run:
+          name: "Generate Checksums"
+          command: |
+            sha256sum dist/snyk-jira-sync-linux > dist/snyk-jira-sync-linux.sha256
+            sha256sum dist/snyk-jira-sync-macos > dist/snyk-jira-sync-macos.sha256
+            sha256sum dist/snyk-jira-sync-win.exe > dist/snyk-jira-sync-win.exe.sha256
       - run:
           name: "Publish Release on GitHub"
           command: |
-            VERSIONJUMP=$(git log --oneline -1 --pretty=%B | cat | grep -E 'minor|major|patch' | awk -F ':' '{print $1}')
-            VERSION=$(/workdir/nextver.sh "$VERSIONJUMP")
+            VERSION=$(cat VERSION)
             ghr -t ${GITHUB_TOKEN} -u ${CIRCLE_PROJECT_USERNAME} -r ${CIRCLE_PROJECT_REPONAME} -c ${CIRCLE_SHA1} ${VERSION} dist/
 
 workflows:
-  version: 2.1
-  nightly:
-    triggers:
-      - schedule:
-          cron: "0 0 * * *"
-          filters:
-            branches:
-              only:
-                - master
-    jobs:
-      - build-test-monitor
   build-test-monitor-publish:
     jobs:
       - build-test-monitor:
@@ -85,16 +70,10 @@ workflows:
             branches:
               only:
                 - master
-  build-test:
+  build-test-workflow:
       jobs:
         - build-test:
             filters:
               branches:
                 ignore:
                   - master
-                  - /pull\/[0-9]+/
-        - build-test-from-fork:
-            filters:
-              branches:
-                only:
-                  - /pull\/[0-9]+/

@@ -727,7 +727,6 @@ func checkJiraValue(JiraValues interface{}) (bool, map[string]interface{}) {
 }
 
 func checkMandatoryField(customJiraMandatoryField_ interface{}, yamlCustomJiraMandatoryField map[interface{}]interface{}) (bool, map[string]interface{}) {
-
 	jsonCustomJiraMandatoryField := make(map[string]interface{})
 	fields := make(map[string]interface{})
 
@@ -742,29 +741,44 @@ func checkMandatoryField(customJiraMandatoryField_ interface{}, yamlCustomJiraMa
 	}
 
 	// converting the type, the yaml type is not compatible with the json one
-	// json doesn't understand map[interface{}]interface{} => it will fail
-	// when marshalling the ticket in a json format
 	jsonCustomJiraMandatoryField = convertYamltoJson(yamlCustomJiraMandatoryField)
 
 	for i, s := range jsonCustomJiraMandatoryField {
-
-		value, ok := s.(map[string]interface{})
-		if ok {
-			v, ok := value["value"].(string)
-			if ok {
-				if strings.HasPrefix(v, JiraPrefix) {
-					s, err = supportJiraFormats(v, debug{PrintDebug: false})
+		switch v := s.(type) {
+		case string:
+			// Handle string values
+			if strings.HasPrefix(v, JiraPrefix) {
+				// Process special Jira formats
+				processedValue, err := supportJiraFormats(v, debug{PrintDebug: false})
+				if err != nil {
+					log.Printf("*** ERROR *** Error while extracting the mandatory Jira fields configuration\n %s", err)
+					return false, nil
+				}
+				fields[i] = processedValue
+			} else {
+				// Use string value directly
+				fields[i] = v
+			}
+		case map[string]interface{}:
+			// Handle map values (existing behavior)
+			if val, ok := v["value"].(string); ok {
+				if strings.HasPrefix(val, JiraPrefix) {
+					processedValue, err := supportJiraFormats(val, debug{PrintDebug: false})
 					if err != nil {
 						log.Printf("*** ERROR *** Error while extracting the mandatory Jira fields configuration\n %s", err)
 						return false, nil
 					}
+					fields[i] = processedValue
+				} else {
+					fields[i] = val
 				}
+			} else {
+				fields[i] = v
 			}
-		} else {
-			log.Println(fmt.Sprintf("*** ERROR *** Expected mandatory Jira fields configuration to be in format map[string]interface{}, received type: %T for field %s ", s, i))
-			return false, nil
+		default:
+			// For any other type, use as is (arrays, etc.)
+			fields[i] = s
 		}
-		fields[i] = s
 	}
 	return true, fields
 }
